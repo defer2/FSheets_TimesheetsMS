@@ -99,7 +99,6 @@ def create_quick_subslot():
     return jsonify(controllers.create_quick_subslot(slot_id, task_id, task_name))
 
 
-
 @view_blueprint.route('/subslots/hour', methods=['POST'])
 def create_subslot_by_hour():
     timesheet_id = request.args.get("timesheet_id")
@@ -147,7 +146,7 @@ def update_subslot_change_slot(subslot_id, new_slot_id):
 
 
 def update_subslot_change_dates(subslot_id, subslot_start_date, subslot_end_date):
-    return jsonify(controllers.update_subslot_change_dates(subslot_id,subslot_start_date,subslot_end_date))
+    return jsonify(controllers.update_subslot_change_dates(subslot_id, subslot_start_date, subslot_end_date))
 
 
 @view_blueprint.route('/subslots/<int:subslot_id>', methods=['DELETE'])

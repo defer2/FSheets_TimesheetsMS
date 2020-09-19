@@ -155,15 +155,16 @@ def delete_subslot(subslot_id):
 def update_subslot_change_dates(subslot_id, subslot_start_date, subslot_end_date):
     one_subslot = db.session.query(Subslots).filter_by(id=subslot_id).one()
     try:
-        subslot_start_date = datetime.datetime.strptime(subslot_start_date, '%Y-%m-%dT%H:%M:%S')
-        subslot_end_date = datetime.datetime.strptime(subslot_end_date, '%Y-%m-%dT%H:%M:%S')
+        subslot_start_date = datetime.datetime.strptime(subslot_start_date, '%Y-%m-%d %H:%M:%S')
+        subslot_end_date = datetime.datetime.strptime(subslot_end_date, '%Y-%m-%d %H:%M:%S')
     except:
         pass
 
-    one_subslot.start_date = subslot_start_date or one_subslot.start_date
-    one_subslot.end_date = subslot_end_date or one_subslot.end_date
+    one_subslot.start_date = subslot_start_date
+    one_subslot.end_date = subslot_end_date
     db.session.add(one_subslot)
     db.session.commit()
+    one_subslot = None
     return SubslotsSchema(many=True).dump(db.session.query(Subslots)
                                           .filter(Subslots.id == subslot_id))
 
