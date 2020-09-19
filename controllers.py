@@ -1,6 +1,6 @@
 import datetime
 from database import db
-from models import Timesheets, TimesheetsSchema, Slots, SlotsSchema, Subslots, SubslotsSchema
+from models import Timesheets, TimesheetsSchema, Slots, SlotsSchema, Subslots, SubslotsSchema, TimesheetsSlotsSchema
 
 
 def hello_world():
@@ -37,7 +37,8 @@ def get_timesheets_by_dates(start_date, end_date):
 
 
 def get_timesheet(timesheet_id):
-    return TimesheetsSchema(many=True).dump(db.session.query(Timesheets).filter(Timesheets.id == timesheet_id))
+    timesheet = db.session.query(Timesheets).filter(timesheet_id == Timesheets.id).all()
+    return TimesheetsSchema(many=True).dump(timesheet)
 
 
 def delete_timesheet(timesheet_id):
@@ -71,8 +72,7 @@ def get_slots(timesheet_id):
 
 
 def get_slot(slot_id):
-    return SlotsSchema(many=True).dump(db.session.query(Slots)
-                                       .filter_by(id=slot_id).one())
+    return SlotsSchema(many=True).dump(db.session.query(Slots).filter(Slots.id == slot_id))
 
 
 def get_slot_by_hour(timesheet_id, slot_hour):
@@ -106,6 +106,19 @@ def create_subslot(slot_id, start_date, end_date, task_id):
     db.session.add(
         Subslots(slot_id=slot_id, start_date=start_date_datetime, end_date=end_date_datetime, task_id=task_id))
     db.session.commit()
+    return SubslotsSchema(many=True).dump(Subslots.query.all())
+
+
+def create_quick_subslot(slot_id, task_id, task_name):
+    one_slot = get_slot(slot_id)[0]
+    new_date = datetime.datetime.strptime(one_slot['hour'], '%Y-%m-%dT%H:%M:%S')
+
+    db.session.add(
+        Subslots(slot_id=slot_id, task_id=task_id, start_date=new_date, end_date=new_date, task_name=task_name))
+    db.session.commit()
+
+    __calculate_subslots_dates(slot_id)
+
     return SubslotsSchema(many=True).dump(Subslots.query.all())
 
 
@@ -183,7 +196,7 @@ def __calculate_subslots_dates(slot_id):
         subslot_start_date = one_subslot.start_date.replace(hour=slot_start_hour, minute=calculated_minutes, second=0)
         one_subslot.start_date = subslot_start_date
         calculated_minutes += minutes_for_each_subslot
-        if count_loops == number_of_subslots-1:
+        if count_loops == number_of_subslots - 1:
             subslot_end_date = one_subslot.end_date.replace(hour=slot_start_hour, minute=59, second=59)
             one_subslot.end_date = subslot_end_date
         else:

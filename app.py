@@ -25,4 +25,4 @@ if __name__ == '__main__':
     if not os.path.isfile('database/timesheets.db'):
         setup_database(app)
 
-    app.run(app.run(port=5004))
+    app.run(app.run(port=5000))

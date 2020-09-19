@@ -1,4 +1,6 @@
+from flask_marshmallow import Schema
 from flask_marshmallow.sqla import SQLAlchemyAutoSchema
+from marshmallow_sqlalchemy.fields import Nested
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 
@@ -8,7 +10,7 @@ from database import db
 class Timesheets(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     date = db.Column(db.Date)
-    Slots = relationship("Slots", back_populates="Timesheets")
+    Slots = relationship("Slots", backref="timesheet")
 
 
 class Slots(db.Model):
@@ -16,31 +18,16 @@ class Slots(db.Model):
     hour = db.Column(db.DateTime, nullable=False)
     status = db.Column(db.Integer)
     timesheet_id = db.Column(db.Integer, ForeignKey('timesheets.id'))
-    Timesheets = relationship("Timesheets", back_populates="Slots")
-    Subslots = relationship("Subslots", back_populates="Slots")
+    Subslots = relationship("Subslots", backref="subslot")
 
 
 class Subslots(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     slot_id = db.Column(db.Integer, ForeignKey('slots.id'))
-    Slots = relationship("Slots", back_populates="Subslots")
     start_date = db.Column(db.DateTime)
     end_date = db.Column(db.DateTime)
     task_id = db.Column(db.Integer)
-
-
-class TimesheetsSchema(SQLAlchemyAutoSchema):
-    class Meta:
-        model = Timesheets
-        include_relationships = True
-        load_instance = True
-
-
-class SlotsSchema(SQLAlchemyAutoSchema):
-    class Meta:
-        model = Slots
-        include_relationships = True
-        load_instance = True
+    task_name = db.Column(db.String)
 
 
 class SubslotsSchema(SQLAlchemyAutoSchema):
@@ -48,3 +35,26 @@ class SubslotsSchema(SQLAlchemyAutoSchema):
         model = Subslots
         include_relationships = True
         load_instance = True
+        include_fk = True
+
+
+class SlotsSchema(SQLAlchemyAutoSchema):
+    Subslots = Nested(SubslotsSchema, many=True)
+
+    class Meta:
+        model = Slots
+
+
+class TimesheetsSchema(SQLAlchemyAutoSchema):
+    Slots = Nested(SlotsSchema, many=True)
+
+    class Meta:
+        model = Timesheets
+
+
+class TimesheetsSlotsSchema(SQLAlchemyAutoSchema):
+    slots = Nested(SlotsSchema, many=True)
+
+    class Meta:
+        model = Timesheets
+
