@@ -1,4 +1,7 @@
 import datetime
+
+from sqlalchemy import asc
+
 from database import db
 from models import Timesheets, TimesheetsSchema, Slots, SlotsSchema, Subslots, SubslotsSchema, TimesheetsSlotsSchema
 
@@ -31,9 +34,12 @@ def get_timesheets_by_date(date):
 
 
 def get_timesheets_by_dates(start_date, end_date):
+    start_date = datetime.datetime.strptime(start_date, '%Y-%m-%d')
+    end_date = datetime.datetime.strptime(end_date, '%Y-%m-%d')
     return TimesheetsSchema(many=True).dump(db.session.query(Timesheets)
-                                            .filter(Timesheets.date <= end_date)
-                                            .filter(Timesheets.date >= start_date))
+                                            .filter(Timesheets.date >= end_date)
+                                            .filter(Timesheets.date <= start_date)
+                                            .order_by(asc(Timesheets.date)).all())
 
 
 def get_timesheet(timesheet_id):
@@ -51,7 +57,7 @@ def delete_timesheet(timesheet_id):
 def __create_timesheet_slots(timesheet_id, date):
     date_datetime = datetime.datetime.strptime(date, '%Y-%m-%d')
     for hour in range(0, 24):
-        hour = date_datetime.replace(hour=hour, minute=0)
+        hour = date_datetime.replace(hour=hour, minute=0, second=0)
         create_slot(timesheet_id, hour)
 
     return SlotsSchema(many=True).dump(db.session.query(Slots)
@@ -60,7 +66,10 @@ def __create_timesheet_slots(timesheet_id, date):
 
 # SLOTS
 def create_slot(timesheet_id, slot_hour):
-    slot_hour_datetime = datetime.datetime.strptime(slot_hour, '%Y-%m-%d %H:%M:%S')
+    try:
+        slot_hour_datetime = datetime.datetime.strptime(slot_hour, '%Y-%m-%d %H:%M:%S')
+    except:
+        slot_hour_datetime = slot_hour
 
     db.session.add(Slots(hour=slot_hour_datetime, status=1, timesheet_id=timesheet_id))
     db.session.commit()
