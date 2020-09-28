@@ -11,6 +11,8 @@ class Timesheets(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     date = db.Column(db.Date)
     Slots = relationship("Slots", backref="timesheet")
+    ppm_synced = db.Column(db.Integer)
+    ppm_last_sync = db.Column(db.Date)
 
 
 class Slots(db.Model):
@@ -19,6 +21,7 @@ class Slots(db.Model):
     status = db.Column(db.Integer)
     timesheet_id = db.Column(db.Integer, ForeignKey('timesheets.id'))
     Subslots = relationship("Subslots", backref="subslot")
+    Timesheet = relationship('Timesheets', foreign_keys='Slots.timesheet_id')
 
 
 class Subslots(db.Model):
