@@ -21,10 +21,10 @@ def setup_database(app_timesheets):
         db.create_all()
 
 
-if __name__ == '__main__':
-    app = create_app()
-    cors = CORS(app)
+app = create_app()
+cors = CORS(app)
 
+if __name__ == '__main__':
     if not os.path.isfile('database/timesheets.db'):
         setup_database(app)
 
