@@ -31,6 +31,8 @@ class Subslots(db.Model):
     end_date = db.Column(db.DateTime)
     task_id = db.Column(db.Integer)
     task_name = db.Column(db.String)
+    task_color = db.Column(db.String)
+    project_id = db.Column(db.Integer)
 
 
 class SubslotsSchema(SQLAlchemyAutoSchema):

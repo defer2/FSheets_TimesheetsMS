@@ -1,7 +1,15 @@
+import configparser
+import os
 from datetime import datetime
 from sqlalchemy import asc
 from database import db
 from models import Timesheets, TimesheetsSchema, Slots, SlotsSchema, Subslots, SubslotsSchema
+import requests
+
+config = configparser.ConfigParser()
+config_path = os.path.join('conf', 'config.ini')
+config.read(config_path)
+api_tasks_url = config.get('FTIMESHEETS', 'API_TASKS_URL')
 
 
 def hello_world():
@@ -27,8 +35,25 @@ def get_timesheets():
 
 
 def get_timesheets_by_date(date):
-    return TimesheetsSchema(many=True).dump(db.session.query(Timesheets)
-                                            .filter(Timesheets.date == date))
+    try:
+        timesheet = TimesheetsSchema(many=True).dump(db.session.query(Timesheets).filter(Timesheets.date == date))
+        if not timesheet:
+            timesheet = create_timesheet(date)[0]
+        else:
+            timesheet = timesheet[0]
+
+        for slot in timesheet['Slots']:
+            for subslot in slot['Subslots']:
+                task_id = subslot['task_id']
+                try:
+                    projectResponse = requests.get(api_tasks_url + '/view/project/' + str(task_id))
+                    project = projectResponse.json()
+                    subslot['project'] = project
+                except:
+                    subslot['project'] = '{}'
+    except:
+        timesheet = '{}'
+    return timesheet
 
 
 def get_timesheets_by_dates(start_date, end_date):
@@ -121,12 +146,13 @@ def create_subslot(slot_id, start_date, end_date, task_id):
     return SubslotsSchema(many=True).dump(Subslots.query.all())
 
 
-def create_quick_subslot(slot_id, task_id, task_name):
+def create_quick_subslot(slot_id, task_id, task_name,task_color, project_id):
     one_slot = get_slot(slot_id)[0]
     new_date = datetime.strptime(one_slot['hour'], '%Y-%m-%dT%H:%M:%S')
 
     db.session.add(
-        Subslots(slot_id=slot_id, task_id=task_id, start_date=new_date, end_date=new_date, task_name=task_name))
+        Subslots(slot_id=slot_id, task_id=task_id, start_date=new_date, end_date=new_date,
+                 task_name=task_name, task_color=task_color, project_id=project_id))
     db.session.commit()
 
     __calculate_subslots_dates(slot_id)
