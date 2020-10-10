@@ -26,8 +26,7 @@ def create_timesheet(date):
 
     __create_timesheet_slots(one_timesheet.id, date)
 
-    return TimesheetsSchema(many=True).dump(db.session.query(Timesheets)
-                                            .filter(Timesheets.id == one_timesheet.id))
+    return get_timesheets_by_date(date_datetime)
 
 
 def get_timesheets():
@@ -36,7 +35,8 @@ def get_timesheets():
 
 def get_timesheets_by_date(date):
     try:
-        timesheet = TimesheetsSchema(many=True).dump(db.session.query(Timesheets).filter(Timesheets.date == date))
+        timesheet_sql = db.session.query(Timesheets).filter(Timesheets.date == date)
+        timesheet = TimesheetsSchema(many=True).dump(timesheet_sql)
         if not timesheet:
             timesheet = create_timesheet(date)[0]
         else:
@@ -50,8 +50,9 @@ def get_timesheets_by_date(date):
                     project = projectResponse.json()
                     subslot['project'] = project
                 except:
-                    subslot['project'] = '{}'
-    except:
+                    subslot['project'] = "{}"
+    except Exception as e:
+        print(e)
         timesheet = '{}'
     return timesheet
 
@@ -140,19 +141,21 @@ def create_subslot(slot_id, start_date, end_date, task_id):
     start_date_datetime = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
     end_date_datetime = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
 
-    db.session.add(
-        Subslots(slot_id=slot_id, start_date=start_date_datetime, end_date=end_date_datetime, task_id=task_id))
+    new_subslot = Subslots(slot_id=slot_id, start_date=start_date_datetime, end_date=end_date_datetime, task_id=task_id)
+    db.session.add(new_subslot)
+    db.session.flush()
     db.session.commit()
-    return SubslotsSchema(many=True).dump(Subslots.query.all())
+    return get_subslot(new_subslot.id)
 
 
-def create_quick_subslot(slot_id, task_id, task_name,task_color, project_id):
+def create_quick_subslot(slot_id, task_id, task_name, task_color):
     one_slot = get_slot(slot_id)[0]
     new_date = datetime.strptime(one_slot['hour'], '%Y-%m-%dT%H:%M:%S')
 
-    db.session.add(
-        Subslots(slot_id=slot_id, task_id=task_id, start_date=new_date, end_date=new_date,
-                 task_name=task_name, task_color=task_color, project_id=project_id))
+    new_subslot = Subslots(slot_id=slot_id, start_date=new_date, end_date=new_date,
+                           task_id=task_id, task_name=task_name, task_color=task_color)
+    db.session.add(new_subslot)
+    db.session.flush()
     db.session.commit()
 
     __calculate_subslots_dates(slot_id)
@@ -160,7 +163,7 @@ def create_quick_subslot(slot_id, task_id, task_name,task_color, project_id):
     another_slot = db.session.query(Slots).filter(Slots.id == slot_id).one()
     update_timesheet_last_sync(another_slot.Timesheet.id, True, None)
 
-    return SubslotsSchema(many=True).dump(Subslots.query.all())
+    return new_subslot.id
 
 
 def create_subslot_by_hour(timesheet_id, slot_hour, start_date, end_date, task_id):
@@ -182,8 +185,26 @@ def get_subslots_by_hour(timesheet_id, slot_hour):
 
 
 def get_subslot(subslot_id):
-    return SubslotsSchema(many=True).dump(db.session.query(Subslots)
-                                          .filter(Subslots.id == subslot_id))
+    one_subslot = db.session.query(Subslots).filter_by(id=subslot_id).one()
+    task_id = one_subslot.task_id
+    try:
+        taskResponse = requests.get(api_tasks_url + '/view/' + str(task_id))
+        task = taskResponse.json()
+        one_subslot.task = task[0]
+
+        projectResponse = requests.get(api_tasks_url + '/view/project/' + str(task_id))
+        project = projectResponse.json()
+    except:
+        one_subslot.task = {}
+
+    return [{"id": one_subslot.id,
+            "slot_id": one_subslot.slot_id,
+             "task_id": one_subslot.task_id,
+             "task_name": one_subslot.task_name,
+             "task_color": one_subslot.task_color,
+             "start_date": one_subslot.start_date,
+             "end_date": one_subslot.end_date,
+             "project": project}]
 
 
 def delete_subslot(subslot_id):
@@ -198,24 +219,40 @@ def delete_subslot(subslot_id):
 
 
 def update_subslot_change_dates(subslot_id, subslot_start_date, subslot_end_date):
-    one_subslot = db.session.query(Subslots).filter_by(id=subslot_id).one()
     try:
+        one_subslot = db.session.query(Subslots).filter_by(id=subslot_id).one()
         subslot_start_date = datetime.strptime(subslot_start_date, '%Y-%m-%d %H:%M:%S')
         subslot_end_date = datetime.strptime(subslot_end_date, '%Y-%m-%d %H:%M:%S')
+        one_subslot.start_date = subslot_start_date
+        one_subslot.end_date = subslot_end_date
+        db.session.add(one_subslot)
+        db.session.commit()
+
+        another_slot = db.session.query(Slots).filter(Slots.id == one_subslot.slot_id).one()
+        update_timesheet_last_sync(another_slot.Timesheet.id, True, None)
+
+        subslot = db.session.query(Subslots).filter(Subslots.id == subslot_id)
+        subslot = subslot.one()
+
+        task_id = subslot.task_id
+
+        try:
+            projectResponse = requests.get(api_tasks_url + '/view/project/' + str(task_id))
+            project = projectResponse.json()
+            subslot.project = project
+        except:
+            subslot.project = "{}"
     except:
-        pass
-
-    one_subslot.start_date = subslot_start_date
-    one_subslot.end_date = subslot_end_date
-    db.session.add(one_subslot)
-    db.session.commit()
-
-    another_slot = db.session.query(Slots).filter(Slots.id == one_subslot.slot_id).one()
-    update_timesheet_last_sync(another_slot.Timesheet.id, True, None)
-
-    one_subslot = None
-    return SubslotsSchema(many=True).dump(db.session.query(Subslots)
-                                          .filter(Subslots.id == subslot_id))
+        return "{}"
+    return [{"id": subslot.id,
+            "slot_id": subslot.slot_id,
+             "task_id": subslot.task_id,
+             "task_name": subslot.task_name,
+             "task_color": subslot.task_color,
+             "start_date": subslot.start_date,
+             "end_date": subslot.end_date,
+             "project": subslot.project,
+             "project": subslot.project['id']}]
 
 
 # private
