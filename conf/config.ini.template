@@ -1,0 +1,10 @@
+[PPM]
+USERNAME = 'user'
+PASSWORD = 'pass'
+URL = 'http://clarityppm.example.com/ppm/rest/v1/'
+
+[FTIMESHEETS]
+API_PROJECTS_URL = http://localhost:5020
+API_TASKS_URL = http://localhost:5021
+API_TIMESHEETS_URL = http://localhost:5022
+API_CLARITYPPM_URL = http://localhost:5023

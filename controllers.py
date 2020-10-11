@@ -161,7 +161,10 @@ def create_quick_subslot(slot_id, task_id, task_name, task_color):
     __calculate_subslots_dates(slot_id)
 
     another_slot = db.session.query(Slots).filter(Slots.id == slot_id).one()
-    update_timesheet_last_sync(another_slot.Timesheet.id, True, None)
+    try:
+        update_timesheet_last_sync(another_slot.Timesheet.id, True, None)
+    except:
+        pass
 
     return new_subslot.id
 
@@ -252,7 +255,7 @@ def update_subslot_change_dates(subslot_id, subslot_start_date, subslot_end_date
              "start_date": subslot.start_date,
              "end_date": subslot.end_date,
              "project": subslot.project,
-             "project": subslot.project['id']}]
+             "project_id": subslot.project['id']}]
 
 
 # private
