@@ -28,5 +28,5 @@ if __name__ == '__main__':
     if not os.path.isfile('database/timesheets.db'):
         setup_database(app)
 
-    app.run(host='192.168.0.50', port=5012)
+    app.run(host='0.0.0.0', port=5012)
 

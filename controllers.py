@@ -9,7 +9,11 @@ import requests
 config = configparser.ConfigParser()
 config_path = os.path.join('conf', 'config.ini')
 config.read(config_path)
-api_tasks_url = config.get('FTIMESHEETS', 'API_TASKS_URL')
+api_settings_url = config.get('FTIMESHEETS', 'API_SETTINGS_URL')
+
+settingsResponse = requests.get(api_settings_url + '/view')
+settings = settingsResponse.json()
+api_tasks_url = settings[0]['API_TASKS_URL']
 
 
 def hello_world():
@@ -26,7 +30,7 @@ def create_timesheet(date):
 
     __create_timesheet_slots(one_timesheet.id, date)
 
-    return get_timesheets_by_date(date_datetime)
+    return one_timesheet.id
 
 
 def get_timesheets():
@@ -38,19 +42,11 @@ def get_timesheets_by_date(date):
         timesheet_sql = db.session.query(Timesheets).filter(Timesheets.date == date)
         timesheet = TimesheetsSchema(many=True).dump(timesheet_sql)
         if not timesheet:
-            timesheet = create_timesheet(date)[0]
+            timesheet_id = create_timesheet(date)
+            timesheet = get_timesheet(timesheet_id)
         else:
             timesheet = timesheet[0]
 
-        for slot in timesheet['Slots']:
-            for subslot in slot['Subslots']:
-                task_id = subslot['task_id']
-                try:
-                    projectResponse = requests.get(api_tasks_url + '/view/project/' + str(task_id))
-                    project = projectResponse.json()
-                    subslot['project'] = project
-                except:
-                    subslot['project'] = "{}"
     except Exception as e:
         print(e)
         timesheet = '{}'
@@ -67,8 +63,25 @@ def get_timesheets_by_dates(start_date, end_date):
 
 
 def get_timesheet(timesheet_id):
-    timesheet = db.session.query(Timesheets).filter(timesheet_id == Timesheets.id).all()
-    return TimesheetsSchema(many=True).dump(timesheet)
+    try:
+        timesheet_sql = db.session.query(Timesheets).filter(Timesheets.id == timesheet_id)
+        timesheet = TimesheetsSchema(many=True).dump(timesheet_sql)[0]
+
+        for slot in timesheet['Slots']:
+            for subslot in slot['Subslots']:
+                task_id = subslot['task_id']
+                try:
+                    projectResponse = requests.get(api_tasks_url + '/view/project/' + str(task_id))
+                    project = projectResponse.json()
+                    subslot['project'] = project
+                except:
+                    subslot['project'] = "{}"
+
+    except Exception as e:
+        print(e)
+        timesheet = '{}'
+
+    return timesheet
 
 
 def update_timesheet_last_sync(timesheet_id, ppm_synced, sync_date):
@@ -89,8 +102,7 @@ def __create_timesheet_slots(timesheet_id, date):
         hour = date_datetime.replace(hour=hour, minute=0, second=0)
         create_slot(timesheet_id, hour)
 
-    return SlotsSchema(many=True).dump(db.session.query(Slots)
-                                       .filter(Slots.timesheet_id == timesheet_id).all())
+    return {}
 
 
 # SLOTS
@@ -102,7 +114,7 @@ def create_slot(timesheet_id, slot_hour):
 
     db.session.add(Slots(hour=slot_hour_datetime, status=1, timesheet_id=timesheet_id))
     db.session.commit()
-    return SlotsSchema(many=True).dump(Slots.query.all())
+    return {}
 
 
 def get_slots(timesheet_id):
